@@ -1,5 +1,6 @@
 const express = require('express');
 
+const mysqlPool = require('./lib/mysqlPool');
 const logger = require('./lib/logger');
 const { validateAgainstSchema } = require('./lib/validation');
 const { LodgingSchema } = require('./models/lodging');
@@ -13,10 +14,57 @@ app.use(express.json());
 
 app.use(logger);
 
-app.get('/lodgings', (req, res) => {
-  res.status(200).send({
-    lodgings: lodgings
-  });
+/*
+ * SELECT COUNT(*) FROM lodgings;
+ */
+async function getLodgingsCount() {
+  const [ results ] = await mysqlPool.query(
+    "SELECT COUNT(*) AS count FROM lodgings"
+  );
+  console.log("  -- results:", results);
+  return results[0].count;
+}
+
+/*
+ * SELECT * FROM lodgings ORDER BY id LIMIT <offset>,<pageSize>
+ */
+async function getLodgingsPage(page) {
+  const count = await getLodgingsCount();
+  const pageSize = 10;
+  const lastPage = Math.ceil(count / pageSize);
+  page = page > lastPage ? lastPage : page;
+  page = page < 1 ? 1 : page;
+  const offset = (page - 1) * pageSize;
+
+  /*
+   * offset = "; DROP TABLES *;"
+   */
+  const [ results ] = await mysqlPool.query(
+    "SELECT * FROM lodgings ORDER BY id LIMIT ?,?",
+    [ offset, pageSize ]
+  );
+
+  return {
+    lodgings: results,
+    page: page,
+    totalPages: lastPage,
+    pageSize: pageSize,
+    count: count
+  };
+}
+
+app.get('/lodgings', async (req, res) => {
+  try {
+    const lodgingsPage = await getLodgingsPage(
+      parseInt(req.query.page) || 1
+    );
+    res.status(200).send(lodgingsPage);
+  } catch (err) {
+    console.error("  -- error:", err);
+    res.status(500).send({
+      err: "Error fetching lodgings page from DB.  Try again later."
+    });
+  }
 });
 
 app.post('/lodgings', (req, res, next) => {
