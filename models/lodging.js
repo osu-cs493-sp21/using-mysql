@@ -17,3 +17,44 @@ exports.LodgingSchema = {
   price: { required: true },
   ownerid: { required: true }
 };
+
+/*
+ * SELECT COUNT(*) FROM lodgings;
+ */
+async function getLodgingsCount() {
+  const [ results ] = await mysqlPool.query(
+    "SELECT COUNT(*) AS count FROM lodgings"
+  );
+  console.log("  -- results:", results);
+  return results[0].count;
+}
+exports.getLodgingsCount = getLodgingsCount;
+
+/*
+ * SELECT * FROM lodgings ORDER BY id LIMIT <offset>,<pageSize>
+ */
+async function getLodgingsPage(page) {
+  const count = await getLodgingsCount();
+  const pageSize = 10;
+  const lastPage = Math.ceil(count / pageSize);
+  page = page > lastPage ? lastPage : page;
+  page = page < 1 ? 1 : page;
+  const offset = (page - 1) * pageSize;
+
+  /*
+   * offset = "; DROP TABLES *;"
+   */
+  const [ results ] = await mysqlPool.query(
+    "SELECT * FROM lodgings ORDER BY id LIMIT ?,?",
+    [ offset, pageSize ]
+  );
+
+  return {
+    lodgings: results,
+    page: page,
+    totalPages: lastPage,
+    pageSize: pageSize,
+    count: count
+  };
+}
+exports.getLodgingsPage = getLodgingsPage;
