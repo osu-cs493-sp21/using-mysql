@@ -2,12 +2,14 @@
  * Lodgings schema and data accessor methods.
  */
 
+const mysqlPool = require('../lib/mysqlPool');
+
 const { extractValidFields } = require('../lib/validation');
 
 /*
  * Schema for a lodging.
  */
-exports.LodgingSchema = {
+const LodgingSchema = {
   name: { required: true },
   description: { required: false },
   street: { required: true },
@@ -17,6 +19,7 @@ exports.LodgingSchema = {
   price: { required: true },
   ownerid: { required: true }
 };
+exports.LodgingSchema = LodgingSchema;
 
 /*
  * SELECT COUNT(*) FROM lodgings;
@@ -58,3 +61,16 @@ async function getLodgingsPage(page) {
   };
 }
 exports.getLodgingsPage = getLodgingsPage;
+
+/*
+ * INSERT INTO lodgings SET ...;
+ */
+async function insertNewLodging(lodging) {
+  lodging = extractValidFields(lodging, LodgingSchema);
+  const [ result ] = await mysqlPool.query(
+    "INSERT INTO lodgings SET ?",
+    lodging
+  );
+  return result.insertId;
+}
+exports.insertNewLodging = insertNewLodging;

@@ -1,9 +1,12 @@
 const express = require('express');
 
-const mysqlPool = require('./lib/mysqlPool');
 const logger = require('./lib/logger');
 const { validateAgainstSchema } = require('./lib/validation');
-const { LodgingSchema, getLodgingsPage } = require('./models/lodging');
+const {
+  LodgingSchema,
+  getLodgingsPage,
+  insertNewLodging
+} = require('./models/lodging');
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -28,14 +31,20 @@ app.get('/lodgings', async (req, res) => {
   }
 });
 
-app.post('/lodgings', (req, res, next) => {
+app.post('/lodgings', async (req, res, next) => {
   console.log("  -- req.body:", req.body);
   if (validateAgainstSchema(req.body, LodgingSchema)) {
-    lodgings.push(req.body);
-    const id = lodgings.length - 1;
-    res.status(201).send({
-      id: id
-    });
+    try {
+      const id = await insertNewLodging(req.body);
+      res.status(201).send({
+        id: id
+      });
+    } catch (err) {
+      console.error("  -- error:", err);
+      res.status(500).send({
+        err: "Error inserting lodging into DB.  Try again later."
+      });
+    }
   } else {
     res.status(400).send({
       err: "Request body does not contain a valid Lodging."
